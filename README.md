@@ -27,6 +27,8 @@ pytorch-image-models参考：
 
 pytorch-image-models开源代码：https://github.com/rwightman/pytorch-image-models
 
+知乎：[https://zhuanlan.zhihu.com/p/350837279](https://zhuanlan.zhihu.com/p/350837279)
+
 2、视觉Transormer注意力可视化的代码参考：https://github.com/zuokuijun/Transformer-Explainability
 
 ​    
