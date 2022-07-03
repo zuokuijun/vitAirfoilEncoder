@@ -1,0 +1,180 @@
+import argparse
+import sys
+import torch
+from PIL import Image
+from torchvision import transforms
+import numpy as np
+import cv2
+import  os
+from timm_v2 import  vit_models
+from vit_rollout import VITAttentionRollout
+from vit_grad_rollout import VITAttentionGradRollout
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--use_cuda', action='store_true', default=False,
+                        help='Use NVIDIA GPU acceleration')
+    parser.add_argument('--image_path', type=str, default='./data/airfoil_map/rae2822.png',
+                        help='Input image path')
+    parser.add_argument('--head_fusion', type=str, default='max',
+                        help='How to fuse the attention heads for attention rollout. \
+                        Can be mean/max/min')
+    parser.add_argument('--discard_ratio', type=float, default=0.9,
+                        help='How many of the lowest 14x14 attention paths should we discard')
+    parser.add_argument('--category_index', type=int, default=None,
+                        help='The category index for gradient rollout')
+    args = parser.parse_args()
+    args.use_cuda = args.use_cuda and torch.cuda.is_available()
+    if args.use_cuda:
+        print("Using GPU")
+    else:
+        print("Using CPU")
+
+    return args
+
+def show_mask_on_image(img, mask):
+    img = np.float32(img) / 255
+    heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
+    heatmap = np.float32(heatmap) / 255
+    cam = heatmap + np.float32(img)
+    cam = cam / np.max(cam)
+    return np.uint8(255 * cam)
+def get_attention_map():
+    args = get_args()
+    # model = torch.hub.load('facebookresearch/deit:main',
+    #     'deit_tiny_patch16_224', pretrained=True)
+    ### VIT模型定义
+    model = vit_models(img_size=224,
+                       patch_size=16,
+                       in_chans=3,
+                       num_classes=10,
+                       embed_dim=768,
+                       depth=12,
+                       num_heads=12,
+                       mlp_ratio=4.,
+                       )
+    model.eval()  # 模型验证
+
+    if args.use_cuda:  # 判断是否利用显卡进行计算
+        model = model.cuda()
+    # 定义图片的预处理方式
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+    ])
+    img = Image.open("./data/airfoil_map/defcnd1.png")  # 遍历 images 路径
+    img = img.resize((224, 224))
+    input_tensor = transform(img).unsqueeze(0)
+    output_tensor = model(input_tensor)
+    latent_vector = output_tensor.detach().numpy()  # 对机翼的几何参数进行编码
+    latent_txt = open(f'./data/attention_vector/defcnd1.txt', mode='w', encoding='utf8')  # 定义对应机翼的几何编码信息
+    # 将机翼的编码进行存储到文件中
+    for j in range(len(latent_vector[0])):
+        data = str(latent_vector[0][j]) + " "
+        latent_txt.write(data)
+        latent_txt.flush()
+    latent_txt.close()
+    if args.use_cuda:
+        input_tensor = input_tensor.cuda()
+
+    if args.category_index is None:
+        # print("Doing Attention Rollout")
+        attention_rollout = VITAttentionRollout(model, head_fusion=args.head_fusion,
+                                                discard_ratio=args.discard_ratio)
+        mask = attention_rollout(input_tensor)
+        name = "attention_rollout_{:.3f}_{}.png".format(args.discard_ratio, args.head_fusion)
+    else:
+        print("Doing Gradient Attention Rollout")
+        grad_rollout = VITAttentionGradRollout(model, discard_ratio=args.discard_ratio)
+        mask = grad_rollout(input_tensor, args.category_index)
+        name = "grad_rollout_{}_{:.3f}_{}.png".format(args.category_index,
+                                                      args.discard_ratio, args.head_fusion)
+
+    np_img = np.array(img)[:, :, ::-1]
+    mask = cv2.resize(mask, (np_img.shape[1], np_img.shape[0]))
+    mask = show_mask_on_image(np_img, mask)
+    # print(type(mask))
+    # cv2.imshow("Input Image", np_img)
+    # cv2.imshow(name, mask)
+    # cv2.imwrite("input.png", np_img)
+    cv2.imwrite("./data/attention_map/depcd.png", mask)
+    cv2.waitKey(-1)
+    cv2.destroyAllWindows()  # 销毁所有显示窗口
+
+def  get_multi_attention_map():
+    args = get_args()
+    # model = torch.hub.load('facebookresearch/deit:main',
+    #     'deit_tiny_patch16_224', pretrained=True)
+    ### VIT模型定义
+    model = vit_models(img_size=224,
+                       patch_size=16,
+                       in_chans=3,
+                       num_classes=10,
+                       embed_dim=768,
+                       depth=12,
+                       num_heads=12,
+                       mlp_ratio=4.,
+                       )
+    model.eval()  # 模型验证
+
+    if args.use_cuda:  # 判断是否利用显卡进行计算
+        model = model.cuda()
+    # 定义图片的预处理方式
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+    ])
+    dir = "./data/airfoil_map/"
+    files = os.listdir(dir)
+    print(len(files))
+    for i in range(len(files)):
+        file = os.path.join(dir, files[i])  # 获取机翼图片的绝对路径
+        img = Image.open(file)  # 遍历 images 路径
+        img = img.resize((224, 224))
+        input_tensor = transform(img).unsqueeze(0)
+        output_tensor = model(input_tensor)
+        latent_vector = output_tensor.detach().numpy()  # 对机翼的几何参数进行编码
+        print("第{}个机翼的编码数据为：{}".format(i, files[i]))
+        # print(latent_vector[0])
+        # print()
+        airfoil_name = files[i].split(".")[0]  # 获取机翼名称
+        latent_txt = open(f'./data/attention_vector/{airfoil_name}.txt', mode='w', encoding='utf8')  # 定义对应机翼的几何编码信息
+        # 将机翼的编码进行存储到文件中
+        for j in range(len(latent_vector[0])):
+            data = str(latent_vector[0][j]) + " "
+            latent_txt.write(data)
+            latent_txt.flush()
+        latent_txt.close()
+        if args.use_cuda:
+            input_tensor = input_tensor.cuda()
+
+        if args.category_index is None:
+            # print("Doing Attention Rollout")
+            attention_rollout = VITAttentionRollout(model, head_fusion=args.head_fusion,
+                                                    discard_ratio=args.discard_ratio)
+            mask = attention_rollout(input_tensor)
+            name = "attention_rollout_{:.3f}_{}.png".format(args.discard_ratio, args.head_fusion)
+        else:
+            print("Doing Gradient Attention Rollout")
+            grad_rollout = VITAttentionGradRollout(model, discard_ratio=args.discard_ratio)
+            mask = grad_rollout(input_tensor, args.category_index)
+            name = "grad_rollout_{}_{:.3f}_{}.png".format(args.category_index,
+                                                          args.discard_ratio, args.head_fusion)
+
+        np_img = np.array(img)[:, :, ::-1]
+        mask = cv2.resize(mask, (np_img.shape[1], np_img.shape[0]))
+        mask = show_mask_on_image(np_img, mask)
+        # print(type(mask))
+        # cv2.imshow("Input Image", np_img)
+        # cv2.imshow(name, mask)
+        # cv2.imwrite("input.png", np_img)
+        cv2.imwrite("./data/attention_map/{}".format(files[i]), mask)
+        cv2.waitKey(-1)
+        cv2.destroyAllWindows()  # 销毁所有显示窗口
+
+
+
+if __name__ == '__main__':
+   get_multi_attention_map()
