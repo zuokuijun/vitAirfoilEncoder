@@ -5,13 +5,7 @@ import numpy as np
 from mlp import MLP
 import time
 """
-model_parameters:  1046523  
-
-single :  
-one:  
-two :
-four：
-six:  
+model_parameters:  1046523   
 """
 def get_prediction_result():
     model = MLP()

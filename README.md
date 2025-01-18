@@ -4,6 +4,10 @@
 
 The repository mainly records how to use VIT to code the airfoil geometry and how to use the encoded information to reconstruct the flow field of the airfoil. 🖐
 
+More details about this work can be found from our paper:
+
+[Fast aerodynamics prediction of laminar airfoils based on deep attention network](https://pubs.aip.org/aip/pof/article-abstract/35/3/037127/2882158/Fast-aerodynamics-prediction-of-laminar-airfoils?redirectedFrom=fulltext)
+
 ---
 
 
@@ -57,5 +61,36 @@ Zhi hu：[https://zhuanlan.zhihu.com/p/350837279](https://zhuanlan.zhihu.com/p/3
 ## 2、 Airfoil flow field prediction
 
 * `cd VIT_flow_field_prediction`
+
 * run `train.py` file to train DAN  
+
 * run `mlp_test.py`  to get  DAN prediction  results  
+
+  **Tips**:  The test model and test data can be found in [[vitAirfoilEncoder](https://www.kaggle.com/datasets/kuijunzuo/vitairfoilencoder/data)]([vitAirfoilEncoder](https://www.kaggle.com/datasets/kuijunzuo/vitairfoilencoder/data))
+
+
+
+## If you feel that our work is helpful to you, please cite our work in your article
+
+
+
+```
+@article{zuo2023fast,
+  title={Fast aerodynamics prediction of laminar airfoils based on deep attention network},
+  author={Zuo, Kuijun and Ye, Zhengyin and Zhang, Weiwei and Yuan, Xianxu and Zhu, Linyang},
+  journal={Physics of Fluids},
+  volume={35},
+  number={3},
+  year={2023},
+  publisher={AIP Publishing}
+}
+```
+
+
+
+
+
+
+
+
+
